@@ -1,0 +1,18 @@
+# Development dependencies for sparselist package
+
+# Build tools
+build>=1.0
+hatchling
+
+# Testing
+pytest>=8.0
+pytest-cov>=5.0
+tox>=4.0
+
+# Code quality
+ruff>=0.3
+mypy>=1.8
+
+# Documentation
+sphinx>=7.0
+sphinx-rtd-theme>=2.0
