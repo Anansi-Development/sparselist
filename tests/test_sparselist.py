@@ -1,5 +1,6 @@
 # tests/test_sparselist.py
 import copy
+import pickle
 from itertools import product
 
 import pytest
@@ -11,6 +12,7 @@ OMIT = object()
 
 # Common test data
 input_variants = {
+    "empty_none": (None, 0),
     "empty_list": ([], 0),
     "empty_dict": ({}, 0),
     "nonempty_list": ([1, 2, 3], 3),
@@ -230,8 +232,8 @@ def test_dict_invalid_keys(invalid_dict, size, default, expected_exception):
     [
         ([1, 2, 3], 3, 0),
         ({0: 1, 5: 6}, 10, 0),
-        ({}, 5, None),
-        ({}, 0, None),
+        (None, 5, None),
+        (None, 0, None),
     ],
     ids=["dense", "sparse", "all_defaults", "empty"],
 )
@@ -285,16 +287,16 @@ def test_default_inplace_mutation_affects_all_defaults(mutable_default, mutate_f
     [
         ({0: 1}, 1, 0, 4, [1, 0, 0, 0], 1),
         ({0: "a", 2: "c"}, 3, None, 6, ["a", None, "c", None, None, None], 2),
-        ({}, 2, 0, 5, [0, 0, 0, 0, 0], 0),
+        (None, 2, 0, 5, [0, 0, 0, 0, 0], 0),
         ({0: "a", 4: "z"}, 6, None, 3, ["a", None, None], 1),
         ({0: 1, 5: 6, 9: 10}, 10, 0, 7, [1, 0, 0, 0, 0, 6, 0], 2),
         ([1, 2, 3, 4, 5], 5, 0, 3, [1, 2, 3], 3),
         ({0: 1}, 5, 0, 0, [], 0),
         ([1, 2, 3], 3, None, 0, [], 0),
         ({0: 1, 5: 6}, 10, 0, 10, [1, 0, 0, 0, 0, 6, 0, 0, 0, 0], 2),
-        ({}, 5, None, 5, [None, None, None, None, None], 0),
+        (None, 5, None, 5, [None, None, None, None, None], 0),
         ({0: "x", 2: "y"}, 5, None, 1, ["x"], 1),
-        ({}, 5, 0, 1, [0], 0),
+        (None, 5, 0, 1, [0], 0),
     ],
     ids=[
         "increase_sparse",
@@ -331,7 +333,7 @@ def test_size_property_modification(initial_data, initial_size, default, new_siz
         ({0: 1}, 5, 0, [5], (TypeError, AttributeError)),
         ({0: 1}, 5, 0, {5}, (TypeError, AttributeError)),
         ({0: 1}, 5, 0, object(), (TypeError, AttributeError)),
-        ({}, 10, 0, -1, ValueError),
+        (None, 10, 0, -1, ValueError),
         ([1, 2, 3], 3, None, "bad", (TypeError, AttributeError)),
     ],
     ids=[
@@ -362,6 +364,62 @@ def test_size_property_invalid(initial_data, initial_size, default, bad_size, ex
 
 
 # ---------------------
+# Pickle tests
+# ---------------------
+@pytest.mark.parametrize(
+    "data,size,default,protocol",
+    [
+        (data, size, default, protocol)
+        for data, size, default in [
+            # Empty sparselist
+            (None, 0, None),
+            (None, 0, "default"),
+            # Simple sparse data
+            ({0: "a", 2: "c"}, 5, None),
+            ({0: "a", 2: "c"}, 5, "_"),
+            # Dense data
+            ({0: 1, 1: 2, 2: 3, 3: 4}, 4, None),
+            # Large dense list
+            (list(range(10000)), 10000, None),
+            # Large sparse data
+            ({0: "first", 1000: "middle", 999999: "last"}, 1000000, None),
+            # Various default values
+            ({5: 100}, 10, 0),
+            ({5: 100}, 10, -1),
+            ({1: "x"}, 3, ""),
+            # Mutable defaults - lists
+            ({0: "a", 5: "b"}, 10, []),
+            ({2: [99]}, 5, [1, 2, 3]),
+            # Mutable defaults - dicts
+            ({1: "x"}, 4, {}),
+            ({0: {"a": 1}}, 3, {"default": True}),
+            # Different types
+            ({0: [1, 2], 2: [3, 4]}, 5, None),
+            ({0: {"key": "val"}}, 3, None),
+        ]
+        for protocol in range(pickle.HIGHEST_PROTOCOL + 1)
+    ],
+)
+def test_pickle_roundtrip(data, size, default, protocol):
+    """Test that sparselist can be pickled and unpickled correctly across all protocol versions."""
+    original = sparselist(data, size=size, default=default)
+    original_key_count = _get_sparselist_key_count(original)
+
+    # Pickle and unpickle
+    pickled = pickle.dumps(original, protocol=protocol)
+    restored = pickle.loads(pickled)
+
+    # Verify equality
+    assert restored == original
+    assert restored.size == original.size
+    assert restored.default == original.default
+    assert list(restored) == list(original)
+
+    # Verify sparsity is preserved
+    assert _get_sparselist_key_count(restored) == original_key_count
+
+
+# ---------------------
 # Iterator tests
 # ---------------------
 def test_iterator_protocol():
@@ -388,8 +446,8 @@ def test_iterator_protocol():
     [
         ({0: 1, 5: 6}, 10, 0, [1, 0, 0, 0, 0, 6, 0, 0, 0, 0]),
         ([1, 2, 3], 3, None, [1, 2, 3]),
-        ({}, 5, "x", ["x", "x", "x", "x", "x"]),
-        ({}, 0, None, []),
+        (None, 5, "x", ["x", "x", "x", "x", "x"]),
+        (None, 0, None, []),
         ({0: "only"}, 1, None, ["only"]),
     ],
     ids=["sparse", "dense", "all_defaults", "empty", "single_element"],
@@ -588,7 +646,7 @@ def generate_invalid_indexing_cases():
         ({0: 1, 2: 3}, 4, 0, 10, None, None, None, True),
         ({0: 1, 2: 3}, 4, 0, -10, None, None, None, True),
         ({0: 1, 2: 3}, 4, 0, 4, None, None, None, True),
-        ({}, 0, None, 0, None, None, None, True),
+        (None, 0, None, 0, None, None, None, True),
     ],
     ids=[
         "del_explicit_at_2",
@@ -649,8 +707,8 @@ def generate_delete_slice_cases():
     configs = [
         ({0: 1, 1: 2, 3: 3, 5: 4}, 10, 0, "sparse"),
         ([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], 10, None, "dense"),
-        ({}, 10, 0, "all_defaults"),
-        ({}, 0, None, "empty"),
+        (None, 10, 0, "all_defaults"),
+        (None, 0, None, "empty"),
     ]
 
     start_stop_values = [
@@ -670,9 +728,13 @@ def generate_delete_slice_cases():
         if isinstance(explicit_values, dict):
             full_list = [explicit_values.get(i, default) for i in range(size)]
             explicit_dict = explicit_values
-        else:
+        elif explicit_values is not None:
             full_list = list(explicit_values)
             explicit_dict = dict(enumerate(explicit_values))
+        else:
+            # None means empty sparselist - fill with defaults based on size
+            full_list = [default] * size
+            explicit_dict = {}
 
         for start, stop, step in product(start_stop_values, start_stop_values, step_values):
             if step == 0:
@@ -1188,8 +1250,8 @@ def test_comparison_operators(data1, size1, default1, data2, size2, default2, us
         ({0: "a", 2: "c"}, 5, 0, 0, True),
         ([1, 2, 3], 3, 0, 0, False),
         ({0: 0, 2: 0}, 5, 0, 0, True),
-        ({}, 5, None, None, True),
-        ({}, 0, 0, 0, False),
+        (None, 5, None, None, True),
+        (None, 0, 0, 0, False),
         ({0: 1, 5: 6}, 10, 0, 0, True),
         ({0: None}, 3, None, None, True),
     ],
@@ -1221,9 +1283,9 @@ def test_in_operator(initial_data, size, default, value, expected):
         ({0: 1}, 3, 0, {0: 5}, 2, None, [1, 0, 0, 5, None], 3),
         ({0: 1}, 3, 0, [10, 20], None, None, [1, 0, 0, 10, 20], 3),
         ([10, 20], None, None, {0: 1}, 3, 0, [10, 20, 1, 0, 0], None),
-        ({}, 0, 0, {0: 1}, 2, 0, [1, 0], 1),
-        ({0: 1}, 2, 0, {}, 0, 0, [1, 0], 1),
-        ({}, 0, None, {}, 0, None, [], 0),
+        (None, 0, 0, {0: 1}, 2, 0, [1, 0], 1),
+        ({0: 1}, 2, 0, None, 0, 0, [1, 0], 1),
+        (None, 0, None, None, 0, None, [], 0),
         ([1, 2], 2, 0, [3, 4], 2, 0, [1, 2, 3, 4], 4),
         ({0: "a", 9: "z"}, 10, "_", {0: "A"}, 5, "-", ["a"] + ["_"] * 8 + ["z", "A"] + ["-"] * 4, 7),
     ],
@@ -1265,7 +1327,7 @@ def test_add_operator(data1, size1, default1, data2, size2, default2, expected_l
         ({0: 1, 2: 3}, 3, 0, 0, [], 0, False),
         ({0: 1, 2: 3}, 3, 0, 1, [1, 0, 3], 2, False),
         ({0: 1}, 2, 0, 3, [1, 0, 1, 0, 1, 0], 3, False),
-        ({}, 3, 0, 2, [0, 0, 0, 0, 0, 0], 0, False),
+        (None, 3, 0, 2, [0, 0, 0, 0, 0, 0], 0, False),
         ({0: 1, 2: 3}, 3, 0, -1, [], 0, False),
         ({0: 1, 2: 3}, 3, 0, -5, [], 0, False),
         ({0: 1, 5: 6}, 10, 0, 2, [1, 0, 0, 0, 0, 6, 0, 0, 0, 0, 1, 0, 0, 0, 0, 6, 0, 0, 0, 0], 4, False),
@@ -1328,10 +1390,10 @@ def test_multiply_operator(initial_data, size, default, multiplier, expected_lis
     [
         ({0: 1}, 2, 0, [10, 20], [1, 0, 10, 20], 3, False),
         ({0: 1}, 2, 0, [], [1, 0], 1, False),
-        ({}, 0, None, [1, 2], [1, 2], 2, False),
+        (None, 0, None, [1, 2], [1, 2], 2, False),
         ({0: 1}, 2, 0, sparselist({0: 10, 2: 30}, size=3, default=None), [1, 0, 10, None, 30], 4, False),
         ({0: 1}, 2, 0, sparselist([0, 0], default=0), [1, 0, 0, 0], 3, False),
-        ({}, 5, 0, sparselist({1: 10}, size=3, default=0), [0, 0, 0, 0, 0, 0, 10, 0], 1, False),
+        (None, 5, 0, sparselist({1: 10}, size=3, default=0), [0, 0, 0, 0, 0, 0, 10, 0], 1, False),
         ({0: 1}, 2, 0, (10, 20, 30), [1, 0, 10, 20, 30], 4, False),
         ({0: 1}, 2, 0, range(3, 6), [1, 0, 3, 4, 5], 4, False),
         ({0: 1}, 2, 0, (x * 2 for x in range(3)), [1, 0, 0, 2, 4], 4, False),
@@ -1389,7 +1451,7 @@ def test_iadd_operator(initial_data, size, default, operand, expected_result, ex
         ({0: 1, 2: 3}, 3, 0, 0, [], 0, False),
         ({0: 1, 2: 3}, 3, 0, 1, [1, 0, 3], 2, False),
         ({0: 1}, 2, 0, 3, [1, 0, 1, 0, 1, 0], 3, False),
-        ({}, 3, 0, 2, [0, 0, 0, 0, 0, 0], 0, False),
+        (None, 3, 0, 2, [0, 0, 0, 0, 0, 0], 0, False),
         ({0: 1, 2: 3}, 3, 0, -1, [], 0, False),
         ({0: 1, 2: 3}, 3, 0, -5, [], 0, False),
         ({0: 1, 5: 6}, 10, 0, 2, [1, 0, 0, 0, 0, 6, 0, 0, 0, 0, 1, 0, 0, 0, 0, 6, 0, 0, 0, 0], 4, False),
@@ -1448,8 +1510,8 @@ def test_imul_operator(initial_data, size, default, multiplier, expected_list, e
         ({0: 1, 9: 10}, 10, 0, "<10/0>[0: 1, ..., 9: 10]"),
         ([1, 2, 3], 3, None, "<3/None>[0: 1, 1: 2, 2: 3]"),
         ([1, 2, 3], 3, 0, "<3/0>[0: 1, 1: 2, 2: 3]"),
-        ({}, 0, None, "<0/None>[]"),
-        ({}, 5, 0, "<5/0>[...]"),
+        (None, 0, None, "<0/None>[]"),
+        (None, 5, 0, "<5/0>[...]"),
         ({0: "a"}, 1, None, "<1/None>[0: 'a']"),
         ({0: "a", 2: "b", 9: "g"}, 10, None, "<10/None>[0: 'a', ..., 2: 'b', ..., 9: 'g']"),
         ({0: "a", 2: "b"}, 5, "", "<5/''>[0: 'a', ..., 2: 'b', ...]"),
@@ -1458,7 +1520,7 @@ def test_imul_operator(initial_data, size, default, multiplier, expected_list, e
         ({2: 10}, 5, 0, "<5/0>[..., 2: 10, ...]"),
         ({0: [1, 2], 3: [3, 4]}, 5, None, "<5/None>[0: [1, 2], ..., 3: [3, 4], ...]"),
         ({0: None}, 3, None, "<3/None>[0: None, ...]"),
-        ({}, 10, [], "<10/[]>[...]"),
+        (None, 10, [], "<10/[]>[...]"),
         ({0: 1, 1: 2}, 2, 0, "<2/0>[0: 1, 1: 2]"),
     ],
     ids=[
@@ -1492,8 +1554,8 @@ def test_repr(initial_data, size, default, expected_repr):
 @pytest.mark.parametrize(
     "initial_data, size, default, value_to_append, expected_list",
     [
-        ({}, 0, None, 5, [5]),
-        ({}, 2, 0, 5, [0, 0, 5]),
+        (None, 0, None, 5, [5]),
+        (None, 2, 0, 5, [0, 0, 5]),
         ({0: 1}, 2, 0, 99, [1, 0, 99]),
         ({0: 1, 5: 6}, 10, 0, "x", [1, 0, 0, 0, 0, 6, 0, 0, 0, 0, "x"]),
         ([1, 2, 3], 3, None, 4, [1, 2, 3, 4]),
@@ -1513,11 +1575,11 @@ def test_append(initial_data, size, default, value_to_append, expected_list):
     "initial_data, size, default, iterable_to_extend, expected_list, expected_key_count",
     [
         ({0: 1}, 2, 0, [10, 20], [1, 0, 10, 20], 3),
-        ({}, 0, None, [1, 2, 3], [1, 2, 3], 3),
+        (None, 0, None, [1, 2, 3], [1, 2, 3], 3),
         ({0: 1}, 2, 0, [], [1, 0], 1),
         ({0: 1}, 2, 0, (x * 2 for x in range(3)), [1, 0, 0, 2, 4], 4),
         ({0: 1}, 2, 0, sparselist({0: 10, 2: 30}, size=3, default=None), [1, 0, 10, None, 30], 4),
-        ({}, 3, 0, [0, 0], [0, 0, 0, 0, 0], 2),
+        (None, 3, 0, [0, 0], [0, 0, 0, 0, 0], 2),
     ],
     ids=[
         "with_list",
@@ -1540,7 +1602,7 @@ def test_extend(initial_data, size, default, iterable_to_extend, expected_list, 
 @pytest.mark.parametrize(
     "initial_data, size, default, index, value, expected_list, expected_size",
     [
-        ({}, 0, None, 0, 99, [99], 1),
+        (None, 0, None, 0, 99, [99], 1),
         ({0: 1, 2: 3}, 4, 0, 0, 99, [99, 1, 0, 3, 0], 5),
         ({0: 1, 2: 3}, 4, 0, 2, 99, [1, 0, 99, 3, 0], 5),
         ({0: 1, 2: 3}, 4, 0, 4, 99, [1, 0, 3, 0, 99], 5),
@@ -1586,8 +1648,8 @@ def test_insert(initial_data, size, default, index, value, expected_list, expect
         ({0: 1, 2: 3}, 5, 0, -2, 0, [1, 0, 3, 0], 4, 2, False),
         ([1, 2, 3], 3, None, None, 3, [1, 2], 2, 2, False),
         ({0: 1}, 1, 0, 0, 1, [], 0, 0, False),
-        ({}, 0, None, None, None, None, None, 0, True),
-        ({}, 0, None, 0, None, None, None, 0, True),
+        (None, 0, None, None, None, None, None, 0, True),
+        (None, 0, None, 0, None, None, None, 0, True),
         ({0: 1, 1: 2}, 3, 0, 5, None, [1, 2, 0], 3, 2, True),
         ({0: 1, 1: 2}, 3, 0, -5, None, [1, 2, 0], 3, 2, True),
     ],
@@ -1641,7 +1703,7 @@ def test_pop(
         ({0: 1, 2: 3}, 5, 0, 0, [1, 3, 0, 0], 4, 2, False),
         ([1, 2, 3], 3, None, 2, [1, 3], 2, 2, False),
         ({0: 0, 2: 1, 4: 0}, 5, 0, 0, [0, 1, 0, 0], 4, 2, False),
-        ({}, 0, None, 1, [], 0, 0, True),
+        (None, 0, None, 1, [], 0, 0, True),
         ({0: 1, 2: 3}, 5, 0, 99, [1, 0, 3, 0, 0], 5, 2, True),
         # Large dense test
         (
@@ -1707,8 +1769,8 @@ def test_remove(initial_data, size, default, value, expected_list, expected_size
     [
         ({0: "a", 4: "e"}, 5, None, ["e", None, None, None, "a"], 2),
         ([1, 2, 3], 3, 0, [3, 2, 1], 3),
-        ({}, 5, 0, [0, 0, 0, 0, 0], 0),
-        ({}, 0, None, [], 0),
+        (None, 5, 0, [0, 0, 0, 0, 0], 0),
+        (None, 0, None, [], 0),
         # Large dense test
         ({i: i for i in range(15000)}, 20000, 0, [0] * 5000 + list(range(14999, -1, -1)), 15000),
         # Large sparse test
@@ -1748,8 +1810,8 @@ def test_reverse(initial_data, size, default, expected_list, expected_key_count)
         ({0: 3, 2: 1, 4: 2}, 5, 0, {"reverse": True}, [3, 2, 1, 0, 0], False),
         ({0: "apple", 2: "zoo", 4: "bee"}, 5, "", {"key": len}, ["", "", "zoo", "bee", "apple"], False),
         ({0: 10, 2: -1, 4: 5}, 5, 0, {"key": abs, "reverse": True}, [10, 5, -1, 0, 0], False),
-        ({}, 5, 0, {}, [0, 0, 0, 0, 0], False),
-        ({}, 0, None, {}, [], False),
+        (None, 5, 0, {}, [0, 0, 0, 0, 0], False),
+        (None, 0, None, {}, [], False),
         ([1, "a", 3], 3, None, {}, None, True),
         # Additional test cases to verify non-materialization with many defaults
         ({0: 100, 999: 200}, 1000, 0, {}, [0] * 998 + [100, 200], False),
@@ -1799,8 +1861,8 @@ def test_sort(initial_data, size, default, sort_kwargs, expected_list, should_ra
     [
         ({0: 1, 5: 6}, 10, 0),
         ([1, 2, 3], 3, None),
-        ({}, 5, "default"),
-        ({}, 0, None),
+        (None, 5, "default"),
+        (None, 0, None),
     ],
     ids=["sparse", "dense", "defaults_only", "empty"],
 )
@@ -1822,13 +1884,13 @@ def test_clear(initial_data, size, default):
         ([1, 2, 3, 2, 1], 5, 0, 2, 2),
         ({0: 1, 2: 1}, 6, 0, 0, 4),
         ({0: "x"}, 10, None, None, 9),
-        ({}, 5, 0, 0, 5),
+        (None, 5, 0, 0, 5),
         ({0: 0, 2: 1, 4: 0}, 6, 0, 0, 5),
         ({0: None, 2: "x"}, 5, None, None, 4),
         ({0: 1, 2: 3}, 5, 0, 99, 0),
         ([1, 2, 3], 3, None, "z", 0),
-        ({}, 0, None, 1, 0),
-        ({}, 0, 0, 0, 0),
+        (None, 0, None, 1, 0),
+        (None, 0, 0, 0, 0),
         ([1, 1, 2, 1, 3], 5, 0, 1, 3),
         ([0, 0, 0], 3, None, 0, 3),
     ],
@@ -1880,7 +1942,7 @@ def test_count(initial_data, size, default, value, expected_count):
         ([1, 2, 3], 3, None, "z", None, None, None, True),
         ({0: 1, 2: 1, 4: 1}, 6, 0, 1, 5, None, None, True),
         ({0: 1, 2: 1, 4: 1}, 6, 0, 2, 0, 2, None, True),
-        ({}, 0, None, 1, None, None, None, True),
+        (None, 0, None, 1, None, None, None, True),
         ({0: 1, 2: 3}, 5, 0, 1, 10, None, None, True),
         ({0: 0, 2: 1, 4: 0}, 6, 0, 0, None, None, 0, False),
         ({0: 0, 2: 1, 4: 0}, 6, 0, 0, 1, None, 1, False),
@@ -1964,9 +2026,9 @@ def test_index(initial_data, size, default, value, start, stop, expected_index, 
         # Dense list - should remain the same
         ([1, 2, 3, 4], 4, 0, [1, 2, 3, 4], 4),
         # All defaults - should become empty
-        ({}, 10, 0, [], 0),
+        (None, 10, 0, [], 0),
         # Empty list - should remain empty
-        ({}, 0, None, [], 0),
+        (None, 0, None, [], 0),
         # Single explicit value at beginning
         ({0: "x"}, 5, "", ["x"], 1),
         # Single explicit value in middle
@@ -2051,7 +2113,7 @@ def test_compact(initial_data, size, default, expected_list, expected_size):
         # Index out of range (negative)
         ({0: "a"}, 5, None, -10, None, None, 1, True),
         # Empty list
-        ({}, 0, None, 0, None, None, 0, True),
+        (None, 0, None, 0, None, None, 0, True),
     ],
     ids=[
         "explicit_at_start",
@@ -2104,10 +2166,10 @@ def test_unset(initial_data, size, default, index, expected_return, expected_lis
         ({0: "a", 2: "c"}, 5, None, "copy_module"),
         ([1, 2, 3], 3, 0, "builtin"),
         ([1, 2, 3], 3, 0, "copy_module"),
-        ({}, 5, 0, "builtin"),
-        ({}, 5, 0, "copy_module"),
-        ({}, 0, None, "builtin"),
-        ({}, 0, None, "copy_module"),
+        (None, 5, 0, "builtin"),
+        (None, 5, 0, "copy_module"),
+        (None, 0, None, "builtin"),
+        (None, 0, None, "copy_module"),
     ],
     ids=[
         "sparse_builtin",

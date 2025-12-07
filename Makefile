@@ -65,10 +65,8 @@ clean:  ## Remove build artifacts and cache files
 	find . -type d -name __pycache__ -exec rm -rf {} +
 	find . -type f -name "*.pyc" -delete
 
-publish-test:  ## Build and publish to TestPyPI (placeholder for future)
-	@echo "TestPyPI publishing not yet configured"
-	@echo "Run: twine upload --repository testpypi dist/*"
+publish-test: clean build  ## Build and publish to TestPyPI
+	twine upload --repository testpypi dist/*
 
-publish:  ## Build and publish to PyPI (placeholder for future)
-	@echo "PyPI publishing not yet configured"
-	@echo "Run: twine upload dist/*"
+publish: clean build  ## Build and publish to PyPI
+	twine upload dist/*

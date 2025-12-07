@@ -18,3 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Properties: `size`, `default`
 - Memory-efficient storage using internal dictionary
 - Support for Python 3.10+
+
+## [1.1.0] - 2025-12-07
+
+### Added
+- Pickle support
+- Initialize with all default arguments

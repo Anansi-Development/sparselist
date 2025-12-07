@@ -16,3 +16,6 @@ mypy>=1.8
 # Documentation
 sphinx>=7.0
 sphinx-rtd-theme>=2.0
+
+# Publishing
+twine>=3.6

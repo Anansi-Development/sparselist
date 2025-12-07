@@ -31,12 +31,16 @@ class sparselist(list[T]):  # noqa: N801
     _default: T | None
 
     def __init__(  # noqa: PLR0912
-        self, data: dict[int, T] | Iterable[T], size: SupportsIndex | None = None, default: T | None = None
+        self,
+        data: dict[int, T] | Iterable[T] | None = None,
+        size: SupportsIndex | None = None,
+        default: T | None = None,
     ) -> None:
         """Initialize a sparselist from data.
 
         Args:
-            data: Initial data (dict or iterable)
+            data: Initial data (optional, defaults to empty)
+                  - None: creates empty sparselist
                   - dict: keys must be non-negative integers, values placed at those indices
                   - iterable: elements populate indices 0, 1, 2, etc.
             size: Total logical size (optional, inferred from data if not provided)
@@ -56,6 +60,14 @@ class sparselist(list[T]):  # noqa: N801
                 size = op_index(size)
             except TypeError:
                 raise TypeError("size must support __index__") from None
+
+        # Handle None data case (empty sparselist)
+        if data is None:
+            final_size = size if size is not None else 0
+            if final_size < 0:
+                raise ValueError("size must be non-negative")
+            self._size = final_size
+            return
 
         if isinstance(data, dict):
             # Validate dict keys
@@ -175,6 +187,24 @@ class sparselist(list[T]):  # noqa: N801
     def __len__(self) -> int:
         """Return the logical size of the list."""
         return self._size
+
+    def __reduce_ex__(self, protocol: SupportsIndex) -> tuple[type[Self], tuple[()], dict[str, Any]]:
+        """Return pickle data, preventing default list subclass behavior."""
+        return (
+            self.__class__,
+            (),  # Create empty sparselist with no args
+            {
+                "data": self._explicit,
+                "size": self._size,
+                "default": self._default,
+            },
+        )
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        """Restore state from pickling."""
+        self._explicit = state["data"]
+        self._size = state["size"]
+        self._default = state["default"]
 
     @overload
     def __getitem__(self, key: SupportsIndex) -> T: ...
@@ -800,7 +830,7 @@ class sparselist(list[T]):  # noqa: N801
 
         if n <= 0:
             # Return empty sparselist with same default
-            return sparselist({}, size=0, default=self._default)
+            return sparselist(size=0, default=self._default)
 
         # Create copy and repeat
         result = sparselist(self._explicit.copy(), size=self._size, default=self._default)
