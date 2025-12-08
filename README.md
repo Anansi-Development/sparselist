@@ -39,7 +39,7 @@ A memory-efficient list subclass that stores only explicitly-set values while ma
 - **Inherits from `list`**: All standard list operations work
 - **Not hashable**: Raises `TypeError` on `hash()` attempts
 - **Sparse storage**: Uses an internal dictionary to store only non-default values
-- **Memory efficient**: A list of size 1,000,000 with 10 values uses O(10) memory, not O(1,000,000)
+- **Memory efficient for large list**: A list of size 1,000,000 with 10 values uses O(10) memory, not O(1,000,000). (For small lists the dictionary overhead is meaningful.)
 
 ## Installation
 
