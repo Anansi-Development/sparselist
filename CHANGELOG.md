@@ -29,3 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Added __getstate__ for __setstate__ symmetry
+
+## [1.3.0] - 2025-12-08
+
+## Added
+- Added reverse iterator support

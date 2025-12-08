@@ -512,6 +512,17 @@ class sparselist(list[T]):  # noqa: N801
             yield self._explicit.get(i, self._default)
             i += 1
 
+    def __reversed__(self) -> Iterator[T | None]:  # type: ignore[override]
+        """Return a reverse iterator over the list values.
+
+        Yields:
+            Values in reverse order (explicit or default)
+        """
+        i = self._size - 1
+        while i >= 0:
+            yield self._explicit.get(i, self._default)
+            i -= 1
+
     def __contains__(self, value: object) -> bool:
         """Check if value is in the list.
 

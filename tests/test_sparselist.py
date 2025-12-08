@@ -610,6 +610,187 @@ def test_iterator_size_modification():
 
 
 # ---------------------
+# Reversed iterator tests
+# ---------------------
+def test_reversed_protocol():
+    """Test that sparselist properly implements the reversed iterator protocol."""
+    sl = sparselist({0: "a", 2: "c", 5: "f"}, size=7, default="_")
+
+    it = reversed(sl)
+    assert iter(it) is it
+
+    assert next(it) == "_"
+    assert next(it) == "f"
+    assert next(it) == "_"
+    assert next(it) == "_"
+    assert next(it) == "c"
+    assert next(it) == "_"
+    assert next(it) == "a"
+
+    with pytest.raises(StopIteration):
+        next(it)
+
+
+@pytest.mark.parametrize(
+    "initial_data, size, default, expected_sequence",
+    [
+        ({0: 1, 5: 6}, 10, 0, [0, 0, 0, 0, 6, 0, 0, 0, 0, 1]),
+        ([1, 2, 3], 3, None, [3, 2, 1]),
+        (None, 5, "x", ["x", "x", "x", "x", "x"]),
+        (None, 0, None, []),
+        ({0: "only"}, 1, None, ["only"]),
+    ],
+    ids=["sparse", "dense", "all_defaults", "empty", "single_element"],
+)
+def test_reversed_yields_all_elements(initial_data, size, default, expected_sequence):
+    """Test that reversed iteration yields exactly the right elements in reverse order."""
+    sl = sparselist(initial_data, size=size, default=default)
+
+    result = []
+    for item in reversed(sl):
+        result.append(item)
+
+    assert result == expected_sequence
+
+
+def test_multiple_reversed_iterators_independent():
+    """Test that multiple reversed iterators over the same sparselist are independent."""
+    sl = sparselist({0: "a", 2: "c"}, size=4, default="_")
+
+    it1 = reversed(sl)
+    it2 = reversed(sl)
+
+    assert next(it1) == "_"
+    assert next(it1) == "c"
+
+    assert next(it2) == "_"
+
+    assert next(it1) == "_"
+
+
+@pytest.mark.parametrize(
+    "modification_type",
+    ["modify_value", "append", "insert_before", "insert_after", "delete_before", "delete_after"],
+    ids=["modify_value", "append", "insert_before", "insert_after", "delete_before", "delete_after"],
+)
+def test_reversed_modification_matches_list(modification_type):
+    """Test that sparselist reversed iterator behaves exactly like list reversed iterator when modified."""
+    regular_list = [1, 2, 3, 4, 5]
+    sparse_list = sparselist([1, 2, 3, 4, 5], default=0)
+
+    list_it = reversed(regular_list)
+    sparse_it = reversed(sparse_list)
+
+    next(list_it)
+    next(sparse_it)
+    next(list_it)
+    next(sparse_it)
+
+    if modification_type == "modify_value":
+        regular_list[1] = 99
+        sparse_list[1] = 99
+    elif modification_type == "append":
+        regular_list.append(6)
+        sparse_list.append(6)
+    elif modification_type == "insert_before":
+        regular_list.insert(1, 99)
+        sparse_list.insert(1, 99)
+    elif modification_type == "insert_after":
+        regular_list.insert(3, 99)
+        sparse_list.insert(3, 99)
+    elif modification_type == "delete_before":
+        del regular_list[0]
+        del sparse_list[0]
+    elif modification_type == "delete_after":
+        del regular_list[4]
+        del sparse_list[4]
+
+    list_remaining = []
+    sparse_remaining = []
+
+    try:
+        while True:
+            list_remaining.append(next(list_it))
+    except StopIteration:
+        pass
+
+    try:
+        while True:
+            sparse_remaining.append(next(sparse_it))
+    except StopIteration:
+        pass
+
+    assert sparse_remaining == list_remaining
+
+
+def test_reversed_size_modification():
+    """Test reversed iterator behavior when size property is modified."""
+    sl = sparselist({0: 1, 4: 5}, size=5, default=0)
+    regular_list = [1, 0, 0, 0, 5]
+
+    sl_it = reversed(sl)
+    list_it = reversed(regular_list)
+
+    assert next(sl_it) == next(list_it)
+    assert next(sl_it) == next(list_it)
+
+    sl.size = 7
+    regular_list.extend([0, 0])
+
+    sl_remaining = list(sl_it)
+    list_remaining = list(list_it)
+
+    assert sl_remaining == list_remaining
+
+    sl2 = sparselist({0: 1, 4: 5}, size=5, default=0)
+    regular_list2 = [1, 0, 0, 0, 5]
+
+    sl2_it = reversed(sl2)
+    list2_it = reversed(regular_list2)
+
+    assert next(sl2_it) == next(list2_it)
+    assert next(sl2_it) == next(list2_it)
+
+    sl2.size = 3
+    del regular_list2[3:]
+
+    sl2_remaining = list(sl2_it)
+    list2_remaining = list(list2_it)
+
+    assert sl2_remaining == list2_remaining
+
+    sl3 = sparselist({0: 1, 2: 3, 4: 5}, size=5, default=0)
+    regular_list3 = [1, 0, 3, 0, 5]
+
+    sl3_it = reversed(sl3)
+    list3_it = reversed(regular_list3)
+
+    assert next(sl3_it) == next(list3_it)
+    assert next(sl3_it) == next(list3_it)
+    assert next(sl3_it) == next(list3_it)
+
+    sl3.size = 2
+    del regular_list3[2:]
+
+    sl3_remaining = []
+    list3_remaining = []
+
+    try:
+        while True:
+            sl3_remaining.append(next(sl3_it))
+    except StopIteration:
+        pass
+
+    try:
+        while True:
+            list3_remaining.append(next(list3_it))
+    except StopIteration:
+        pass
+
+    assert sl3_remaining == list3_remaining
+
+
+# ---------------------
 # Deletion tests
 # ---------------------
 def generate_indexing_cases():

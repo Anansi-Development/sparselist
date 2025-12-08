@@ -224,7 +224,7 @@ sl = sparselist({0: 'a', 5: 'b'}, size=100, default='x')
 
 ## Iteration
 
-- Supports iterator protocol
+- Supports iterator and reverse iterator protocols
 - Yields values in order (explicit or default)
 - Iterator behavior under modification matches regular list behavior exactly
 

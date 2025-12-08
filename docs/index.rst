@@ -46,5 +46,5 @@ API Reference
 .. autoclass:: sparselist.sparselist
    :members:
    :undoc-members:
-   :special-members: __init__, __len__, __reduce_ex__, __getstate__, __setstate__, __getitem__, __setitem__, __delitem__, __iter__, __contains__, __eq__, __ne__, __lt__, __le__, __gt__, __ge__, __add__, __radd__, __iadd__, __mul__, __rmul__, __imul__, __copy__, __repr__, __hash__
+   :special-members: __init__, __len__, __reduce_ex__, __getstate__, __setstate__, __getitem__, __setitem__, __delitem__, __iter__, __reversed__, __contains__, __eq__, __ne__, __lt__, __le__, __gt__, __ge__, __add__, __radd__, __iadd__, __mul__, __rmul__, __imul__, __copy__, __repr__, __hash__
    :member-order: bysource
