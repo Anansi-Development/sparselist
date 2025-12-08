@@ -24,3 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Pickle support
 - Initialize with all default arguments
+
+## [1.2.0] - 2025-12-08
+
+### Added
+- Added __getstate__ for __setstate__ symmetry

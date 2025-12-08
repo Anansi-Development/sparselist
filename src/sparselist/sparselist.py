@@ -193,12 +193,16 @@ class sparselist(list[T]):  # noqa: N801
         return (
             self.__class__,
             (),  # Create empty sparselist with no args
-            {
-                "data": self._explicit,
-                "size": self._size,
-                "default": self._default,
-            },
+            self.__getstate__(),
         )
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Return state for pickling."""
+        return {
+            "data": self._explicit,
+            "size": self._size,
+            "default": self._default,
+        }
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         """Restore state from pickling."""
