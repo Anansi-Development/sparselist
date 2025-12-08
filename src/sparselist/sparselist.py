@@ -946,11 +946,6 @@ class sparselist(list[T]):  # noqa: N801
     def __sizeof__(self) -> int:
         """Return the size of the sparselist in bytes.
 
-        Returns the memory footprint of the sparselist, accounting for:
-        - The base object size
-        - The explicit values dictionary and its contents
-        - The size and default attributes
-
         Returns:
             Size in bytes
         """
