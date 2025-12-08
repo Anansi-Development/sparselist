@@ -32,15 +32,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.3.0] - 2025-12-08
 
-## Added
+### Added
 - Added reverse iterator support
 
 ## [1.4.0] - 2025-12-08
 
-## Added
+### Added
 - Added boolean context support
 
 ## [1.5.0] - 2025-12-08
 
-## Added
+### Added
 - Added sizeof calculation
+
+## [1.6.0] - 2025-12-08
+
+### Added
+- Added deepcopy support 

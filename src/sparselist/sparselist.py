@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from operator import index as op_index
 from sys import getsizeof
 from typing import TYPE_CHECKING, TypeVar, overload
@@ -942,6 +943,21 @@ class sparselist(list[T]):  # noqa: N801
             New sparselist with same size, default, and explicit values
         """
         return sparselist(self._explicit.copy(), size=self._size, default=self._default)
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> sparselist[T]:
+        """Return a deep copy of the sparselist.
+
+        Args:
+            memo: Dictionary of objects already copied during this operation
+
+        Returns:
+            New sparselist with deeply copied size, default, and explicit values
+        """
+        return sparselist(
+            deepcopy(self._explicit, memo),
+            size=self._size,
+            default=deepcopy(self._default, memo),
+        )
 
     def __sizeof__(self) -> int:
         """Return the size of the sparselist in bytes.

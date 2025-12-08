@@ -2487,54 +2487,150 @@ def test_unset(initial_data, size, default, index, expected_return, expected_lis
 # Copy tests
 # ---------------------
 @pytest.mark.parametrize(
-    "initial_data, size, default, copy_method",
+    "data, size, default, mutable, mutable_default",
     [
-        ({0: 1, 5: 6}, 10, 0, "builtin"),
-        ({0: 1, 5: 6}, 10, 0, "copy_module"),
-        ({0: "a", 2: "c"}, 5, None, "builtin"),
-        ({0: "a", 2: "c"}, 5, None, "copy_module"),
-        ([1, 2, 3], 3, 0, "builtin"),
-        ([1, 2, 3], 3, 0, "copy_module"),
-        (None, 5, 0, "builtin"),
-        (None, 5, 0, "copy_module"),
-        (None, 0, None, "builtin"),
-        (None, 0, None, "copy_module"),
+        # Immutable elements, immutable default
+        ({0: 1, 5: 6}, 10, 0, False, False),
+        ({0: "a", 2: "c"}, 5, None, False, False),
+        ([1, 2, 3], 3, 0, False, False),
+        (None, 5, 0, False, False),
+        (None, 0, None, False, False),
+        # Mutable elements, immutable default
+        ({0: [1, 2], 2: [3, 4]}, 5, None, True, False),
+        ({1: {"key": "val"}, 3: {"x": "y"}}, 5, None, True, False),
+        ([["a"], ["b"], ["c"]], 3, None, True, False),
+        # Mutable default
+        ({0: "a", 2: "c"}, 5, [], False, True),
+        ({1: "x"}, 3, {"default": True}, False, True),
     ],
     ids=[
-        "sparse_builtin",
-        "sparse_copy_module",
-        "sparse_none_builtin",
-        "sparse_none_copy_module",
-        "dense_builtin",
-        "dense_copy_module",
-        "all_defaults_builtin",
-        "all_defaults_copy_module",
-        "empty_builtin",
-        "empty_copy_module",
+        "immutable_sparse_int",
+        "immutable_sparse_str",
+        "immutable_dense",
+        "immutable_all_defaults",
+        "immutable_empty",
+        "mutable_list",
+        "mutable_dict",
+        "mutable_dense",
+        "mutable_default_list",
+        "mutable_default_dict",
     ],
 )
-def test_copy_returns_sparselist(initial_data, size, default, copy_method):
-    """Test copy returns independent sparselist with same properties."""
-    sl = sparselist(initial_data, size=size, default=default)
+def test_copy(data, size, default, mutable, mutable_default):
+    """Test copy creates shallow copy (independent structure, shared mutable elements)."""
+    sl = sparselist(data, size=size, default=default)
     original_key_count = _get_sparselist_key_count(sl)
 
-    sl_copy = sl.copy() if copy_method == "builtin" else copy.copy(sl)
+    # Test both copy methods
+    for copy_method in ["builtin", "copy_module"]:
+        sl_copy = sl.copy() if copy_method == "builtin" else copy.copy(sl)
 
-    assert isinstance(sl_copy, sparselist)
-    assert sl_copy == sl
-    assert list(sl_copy) == list(sl)
-    assert sl_copy is not sl
-    assert sl_copy.default == sl.default
-    assert sl_copy.size == sl.size
-    assert _get_sparselist_key_count(sl_copy) == original_key_count
+        # Verify copy properties
+        assert isinstance(sl_copy, sparselist)
+        assert sl_copy is not sl
+        assert sl_copy == sl
+        assert sl_copy.default == sl.default
+        assert sl_copy.size == sl.size
+        assert _get_sparselist_key_count(sl_copy) == original_key_count
+
+        if mutable_default:
+            # Mutable default: mutations should affect both lists (shallow copy behavior)
+            assert sl.default is not None
+            assert sl_copy.default is not None
+            assert sl_copy.default is sl.default  # Same object reference
+            if isinstance(sl.default, list):
+                sl_copy.default.append(999)
+                assert sl.default[-1] == 999  # Original affected by mutation
+            elif isinstance(sl.default, dict):
+                sl_copy.default["new_key"] = "new_val"
+                assert sl.default["new_key"] == "new_val"  # Original affected by mutation
+
+        if mutable and sl.size > 0:
+            # Mutable elements: mutations should affect both lists (shallow copy behavior)
+            if isinstance(sl[0], list):
+                sl_copy[0].append(999)
+                assert sl[0][-1] == 999  # Original affected by mutation
+            elif isinstance(sl[0], dict):
+                sl_copy[0]["new_key"] = "new_val"
+                assert sl[0]["new_key"] == "new_val"  # Original affected by mutation
+
+        if sl.size > 0:
+            # Reassignment should NOT affect the other list (applies to both mutable and immutable)
+            original_value = sl[0]
+            sl_copy[0] = "REASSIGNED"
+            assert sl[0] == original_value  # Original unchanged
+
+
+@pytest.mark.parametrize(
+    "data, size, default, mutable, mutable_default",
+    [
+        # Immutable elements, immutable default
+        ({0: 1, 5: 6}, 10, 0, False, False),
+        ({0: "a", 2: "c"}, 5, None, False, False),
+        ([1, 2, 3], 3, 0, False, False),
+        (None, 5, 0, False, False),
+        (None, 0, None, False, False),
+        # Mutable elements, immutable default
+        ({0: [1, 2], 2: [3, 4]}, 5, None, True, False),
+        ({1: {"key": "val"}, 3: {"x": "y"}}, 5, None, True, False),
+        ([["a"], ["b"], ["c"]], 3, None, True, False),
+        # Mutable default
+        ({0: "a", 2: "c"}, 5, [], False, True),
+        ({1: "x"}, 3, {"default": True}, False, True),
+    ],
+    ids=[
+        "immutable_sparse_int",
+        "immutable_sparse_str",
+        "immutable_dense",
+        "immutable_all_defaults",
+        "immutable_empty",
+        "mutable_list",
+        "mutable_dict",
+        "mutable_dense",
+        "mutable_default_list",
+        "mutable_default_dict",
+    ],
+)
+def test_deepcopy(data, size, default, mutable, mutable_default):
+    """Test copy.deepcopy() creates deep copy (independent structure and elements)."""
+    sl = sparselist(data, size=size, default=default)
+    original_key_count = _get_sparselist_key_count(sl)
+    sl_deep = copy.deepcopy(sl)
+
+    # Verify copy properties
+    assert isinstance(sl_deep, sparselist)
+    assert sl_deep is not sl
+    assert sl_deep == sl
+    assert sl_deep.size == sl.size
+    assert sl_deep.default == sl.default
+    assert _get_sparselist_key_count(sl_deep) == original_key_count
+
+    if mutable_default:
+        # Mutable default: mutations should NOT affect the other list (deep copy behavior)
+        assert sl.default is not None
+        assert sl_deep.default is not None
+        assert sl_deep.default is not sl.default  # Different object reference
+        if isinstance(sl.default, list):
+            sl_deep.default.append(999)
+            assert 999 not in sl.default  # Original NOT affected by mutation
+        elif isinstance(sl.default, dict):
+            sl_deep.default["new_key"] = "new_val"
+            assert "new_key" not in sl.default  # Original NOT affected by mutation
+
+    if mutable and sl.size > 0:
+        # Mutable elements: mutations should NOT affect the other list (deep copy behavior)
+        if isinstance(sl[0], list):
+            sl_deep[0].append(999)
+            assert 999 not in sl[0]  # Original NOT affected by mutation
+        elif isinstance(sl[0], dict):
+            sl_deep[0]["new_key"] = "new_val"
+            assert "new_key" not in sl[0]  # Original NOT affected by mutation
 
     if sl.size > 0:
-        sl_copy[0] = "MODIFIED"
-        assert sl[0] != "MODIFIED"
-
-    if sl.size > 0:
-        sl[0] = "ORIGINAL_MODIFIED"
-        assert sl_copy[0] == "MODIFIED"
+        # Reassignment should NOT affect the other list (applies to both mutable and immutable)
+        original_value = sl[0]
+        sl_deep[0] = "REASSIGNED"
+        assert sl[0] == original_value  # Original unchanged
 
 
 # ---------------------
