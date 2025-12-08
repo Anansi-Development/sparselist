@@ -1305,6 +1305,47 @@ def test_slice_assignment_length_mismatch(
 
 
 # ---------------------
+# Boolean context tests
+# ---------------------
+@pytest.mark.parametrize(
+    "data, size, default, expected_bool, equivalent_list",
+    [
+        (None, 0, None, False, []),
+        (None, 10, None, True, [None] * 10),
+        ({0: "a", 5: "b"}, 10, None, True, ["a"] + [None] * 4 + ["b"] + [None] * 4),
+        (None, 10, "x", True, ["x"] * 10),
+        ([1, 2, 3], 3, None, True, [1, 2, 3]),
+        ({}, 0, "default", False, []),
+        ({0: None}, 1, None, True, [None]),
+        ({}, 1000000, None, True, [None] * 1000000),
+    ],
+    ids=[
+        "empty",
+        "non_empty_all_none",
+        "with_explicit_values",
+        "with_default",
+        "from_list",
+        "empty_with_default",
+        "single_none_value",
+        "large_sparse",
+    ],
+)
+def test_bool(data, size, default, expected_bool, equivalent_list):
+    """Test that __bool__ returns False only when size is 0, matching list behavior."""
+    sl = sparselist(data, size=size, default=default)
+    assert bool(sl) is expected_bool
+
+    # Test in conditional context
+    if expected_bool:
+        assert sl  # Should be truthy
+    else:
+        assert not sl  # Should be falsy
+
+    # Test matches list behavior
+    assert bool(sl) == bool(equivalent_list)
+
+
+# ---------------------
 # Comparison operator tests
 # ---------------------
 def generate_comparison_cases():

@@ -539,6 +539,14 @@ class sparselist(list[T]):  # noqa: N801
         # Check explicit values
         return value in self._explicit.values()
 
+    def __bool__(self) -> bool:
+        """Return True if the sparselist is non-empty.
+
+        Returns:
+            False if size is 0, True otherwise
+        """
+        return self._size != 0
+
     def __eq__(self, other: object) -> bool:  # noqa: PLR0911,PLR0912
         """Return True if self equals other.
 

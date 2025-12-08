@@ -34,3 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Added
 - Added reverse iterator support
+
+## [1.4.0] - 2025-12-08
+
+## Added
+- Added boolean context support
