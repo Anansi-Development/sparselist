@@ -39,3 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Added
 - Added boolean context support
+
+## [1.5.0] - 2025-12-08
+
+## Added
+- Added sizeof calculation

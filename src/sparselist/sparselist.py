@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from operator import index as op_index
+from sys import getsizeof
 from typing import TYPE_CHECKING, TypeVar, overload
 
 if TYPE_CHECKING:
@@ -941,6 +942,37 @@ class sparselist(list[T]):  # noqa: N801
             New sparselist with same size, default, and explicit values
         """
         return sparselist(self._explicit.copy(), size=self._size, default=self._default)
+
+    def __sizeof__(self) -> int:
+        """Return the size of the sparselist in bytes.
+
+        Returns the memory footprint of the sparselist, accounting for:
+        - The base object size
+        - The explicit values dictionary and its contents
+        - The size and default attributes
+
+        Returns:
+            Size in bytes
+        """
+        # Base object size
+        size = object.__sizeof__(self)
+
+        # Add size of _explicit dict structure
+        size += self._explicit.__sizeof__()
+
+        # Add size of each key-value pair in _explicit
+        for key, value in self._explicit.items():
+            size += getsizeof(key)
+            size += getsizeof(value)
+
+        # Add size of _size (int) - use __sizeof__ for scalar
+        size += self._size.__sizeof__()
+
+        # Add size of _default (always has a value, even if None)
+        # We use getsizeof here because default could be a complex object
+        size += getsizeof(self._default)
+
+        return size
 
     def __repr__(self) -> str:
         """Return a string representation of the sparselist.

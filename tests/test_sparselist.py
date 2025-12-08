@@ -2,6 +2,7 @@
 import copy
 import pickle
 from itertools import product
+from sys import getsizeof
 
 import pytest
 
@@ -1729,6 +1730,103 @@ def test_imul_operator(initial_data, size, default, multiplier, expected_list, e
         assert id(sl) == original_id
         assert list(sl) == expected_list
         assert _get_sparselist_key_count(sl) == expected_key_count
+
+
+# ---------------------
+# Sizeof tests
+# ---------------------
+def generate_sizeof_cases():
+    """Generate sizeof test cases with min size bounds."""
+    test_cases = [
+        # Basic cases
+        (None, 0, None, "empty"),
+        ({0: 1}, 1, None, "single_value"),
+        ({0: 1, 5: 6}, 10, 0, "sparse"),
+        ({0: 1, 1: 2, 2: 3, 3: 4}, 4, None, "dense_small"),
+        # Large sparse
+        ({0: "first", 999999: "last"}, 1000000, None, "very_sparse"),
+        # Complex data types - lists
+        ({0: [1, 2, 3], 5: [4, 5, 6]}, 10, [], "list_values"),
+        # Complex data types - dicts
+        ({0: {"a": 1}, 3: {"b": 2}}, 5, {}, "dict_values"),
+        # Long strings
+        ({0: "x" * 1000, 2: "y" * 1000}, 5, "default", "long_strings"),
+        # Default is a list
+        ({1: "special"}, 10, [1, 2, 3], "list_default"),
+        # Default is a dict
+        ({0: "a"}, 5, {"default": True}, "dict_default"),
+        # Large default string
+        ({0: "override"}, 100, "default_value" * 100, "large_string_default"),
+    ]
+
+    cases = []
+    for data, size, default, test_id in test_cases:
+        # Convert data to dict if needed
+        if data is None:
+            data_dict = {}
+        elif isinstance(data, dict):
+            data_dict = data
+        else:
+            # It's a list
+            data_dict = dict(enumerate(data))
+
+        # Min bound: dict structure + keys/values + size + default
+        min_size = data_dict.__sizeof__()
+        for key, value in data_dict.items():
+            min_size += getsizeof(key) + getsizeof(value)
+        min_size += size.__sizeof__()
+        min_size += getsizeof(default)
+
+        cases.append((data, size, default, min_size, test_id))
+
+    return cases
+
+
+@pytest.mark.parametrize(
+    "data, size, default, min_size",
+    [
+        (data, size, default, min_size)
+        for data, size, default, min_size, _ in generate_sizeof_cases()
+    ],
+    ids=[test_id for *_, test_id in generate_sizeof_cases()],
+)
+def test_sizeof(data, size, default, min_size):
+    """Test that __sizeof__ returns at least the minimum required size."""
+    sl = sparselist(data, size=size, default=default)
+    sizeof_result = sl.__sizeof__()
+
+    # Should be at least the minimum (dict structure + keys/values + size + default)
+    assert sizeof_result >= min_size, f"sizeof too small: {sizeof_result} < {min_size}"
+
+    # Should return a positive integer
+    assert isinstance(sizeof_result, int)
+    assert sizeof_result > 0
+
+
+def test_sizeof_sparse_vs_dense():
+    """Test that sparse lists use less memory than dense lists."""
+    # Dense: 1000 explicit values
+    dense = sparselist(list(range(1000)), size=1000)
+
+    # Sparse: only 2 explicit values, same size
+    sparse = sparselist({0: 0, 999: 999}, size=1000, default=0)
+
+    # Dense should be significantly larger
+    # The dense list has 998 more entries than sparse
+    # Each entry adds at least: getsizeof(key) + getsizeof(value)
+    extra_entries = 998
+    min_extra_size = extra_entries * (getsizeof(1) + getsizeof(1))  # keys and values are small ints
+    assert getsizeof(dense) >= getsizeof(sparse) + min_extra_size
+
+
+def test_sizeof_size_independent():
+    """Test that sizeof depends on explicit values, not total size."""
+    # Same explicit values, different sizes
+    small = sparselist({0: "a", 5: "b"}, size=10)
+    large = sparselist({0: "a", 5: "b"}, size=1000000)
+
+    # Should be very similar in size (within 10% to account for int size differences)
+    assert abs(getsizeof(large) - getsizeof(small)) / getsizeof(small) < 0.1
 
 
 # ---------------------
