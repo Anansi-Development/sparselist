@@ -236,15 +236,38 @@ for value in sl:
 
 ## Copy Support
 
-- `copy.copy(sl)` works via `__copy__` method
-- Returns new sparselist with same properties
+Supports both shallow and deep copying:
+
+**Shallow copy** (`copy.copy()` or `.copy()` method):
+- Creates new sparselist with independent structure
+- Mutable elements and defaults are shared (same object references)
+- Mutating shared objects affects both copies
+
+**Deep copy** (`copy.deepcopy()`):
+- Creates new sparselist with fully independent elements
+- Mutable elements and defaults are recursively copied
+- Mutations only affect the specific copy
 
 ```python
 import copy
+
+# Shallow copy - immutable elements
 sl1 = sparselist({0: 'a', 5: 'b'}, size=10, default='x')
 sl2 = copy.copy(sl1)
 sl2[0] = 'c'
-sl1[0]  # Still 'a'
+sl1[0]  # Still 'a' (reassignment doesn't affect original)
+
+# Shallow copy - mutable elements are shared
+sl3 = sparselist({0: [1, 2]}, size=5, default=[])
+sl4 = copy.copy(sl3)
+sl4[0].append(99)
+sl3[0]  # [1, 2, 99] (mutation affects both!)
+
+# Deep copy - mutable elements are independent
+sl5 = sparselist({0: [1, 2]}, size=5, default=[])
+sl6 = copy.deepcopy(sl5)
+sl6[0].append(99)
+sl5[0]  # Still [1, 2] (mutation doesn't affect original)
 ```
 
 ## String Representation
