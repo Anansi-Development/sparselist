@@ -1784,10 +1784,7 @@ def generate_sizeof_cases():
 
 @pytest.mark.parametrize(
     "data, size, default, min_size",
-    [
-        (data, size, default, min_size)
-        for data, size, default, min_size, _ in generate_sizeof_cases()
-    ],
+    [(data, size, default, min_size) for data, size, default, min_size, _ in generate_sizeof_cases()],
     ids=[test_id for *_, test_id in generate_sizeof_cases()],
 )
 def test_sizeof(data, size, default, min_size):
